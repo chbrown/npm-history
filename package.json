@@ -1,8 +1,13 @@
 {
   "name": "npm-history",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "NPM download-counts API client with permanent cache",
-  "keywords": ["npm", "download", "counts", "history"],
+  "keywords": [
+    "npm",
+    "download",
+    "counts",
+    "history"
+  ],
   "homepage": "https://github.com/chbrown/npm-history",
   "repository": "git://github.com/chbrown/npm-history.git",
   "license": "MIT",
