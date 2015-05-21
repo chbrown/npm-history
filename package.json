@@ -1,0 +1,30 @@
+{
+  "name": "npm-history",
+  "version": "0.0.1",
+  "description": "NPM download-counts API client with permanent cache",
+  "keywords": ["npm", "download", "counts", "history"],
+  "homepage": "https://github.com/chbrown/npm-history",
+  "repository": "git://github.com/chbrown/npm-history.git",
+  "license": "MIT",
+  "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
+  "dependencies": {
+    "async": "*",
+    "http-enhanced": "*",
+    "loge": "*",
+    "moment": "*",
+    "regex-router": "*",
+    "request": "*",
+    "sqlcmd-pg": "*",
+    "streaming": "*",
+    "yargs": "*"
+  },
+  "devDependencies": {
+    "typescript": "*"
+  },
+  "bin": {
+    "npm-history": "bin/npm-history"
+  },
+  "scripts": {
+    "start": "node bin/npm-history"
+  }
+}
