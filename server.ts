@@ -157,6 +157,10 @@ class Controller {
             res.statusCode = 500;
             return res.end(`getPackageStatistics error: ${error.message}`);
           }
+          res.setHeader('Content-Type', 'application/json');
+          if (req.method == 'HEAD') {
+            return res.end('');
+          }
           var result = statistics.map(statistic => {
             return {
               day: moment.utc(statistic.day).format('YYYY-MM-DD'),
