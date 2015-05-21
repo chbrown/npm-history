@@ -33,9 +33,13 @@ db.on('log', function(ev) {
   logger[ev.level].apply(logger, args);
 });
 
-const RANGE_DAYS = 180;
-// const NPM_EPOCH = moment.utc('2009-09-29');
+const NPM_EPOCH = '2009-09-29';
 
+/**
+Custom-built 'INSERT INTO <table> (<columns>) VALUES (<row1>), (<row2>), ...;'
+SQL query for inserting statistic rows. I don't think there are any limits on
+the number of parameters you can have in a prepared query.
+*/
 function buildMultirowInsert(package_id: number, statistics: Statistic[]) {
   var args: any[] = [package_id];
   var tuples: string[] = statistics.map(statistic => {
@@ -49,6 +53,10 @@ function buildMultirowInsert(package_id: number, statistics: Statistic[]) {
   return [`INSERT INTO statistic (package_id, day, downloads) VALUES ${tuples.join(', ')}`, args];
 }
 
+/**
+Given a package name, return the full package row from the database, creating
+one if needed.
+*/
 function findOrCreatePackage(name: string, callback: (error: Error, package?: Package) => void) {
   db.Select('package')
   .whereEqual({name: name})
@@ -63,7 +71,103 @@ function findOrCreatePackage(name: string, callback: (error: Error, package?: Pa
   });
 }
 
-function getPackageStatistics(name: string, callback: (error: Error, statistics?: Statistic[]) => void) {
+/**
+Given a package name (string) and start/end dates, call out to the NPM API
+download-counts endpoint for that range. Collect these into a proper array of
+Statistic objects, where `downloads` is zero for the days omitted from the response.
+*/
+function getRangeStatistics(name: string, start: moment.Moment, end: moment.Moment,
+                            callback: (error: Error, statistics?: Statistic[]) => void) {
+  var url = `https://api.npmjs.org/downloads/range/${start.format('YYYY-MM-DD')}:${end.format('YYYY-MM-DD')}/${name}`;
+  logger.debug('fetching "%s"', url);
+  request.get({url: url, json: true}, (error: Error, response: http.IncomingMessage, body: any) => {
+    if (error) return callback(error);
+
+    var downloads_default = 0;
+
+    if (body.error) {
+      // we consider missing stats (0008) a non-fatal error, though I'm not sure
+      // what causes it. but instead of setting the downloads for those dates to 0,
+      // which is probably what the server means, we set them to -1 (as a sort of error value)
+      if (body.error == "no stats for this package for this range (0008)") {
+        body.downloads = [];
+        downloads_default = -1;
+      }
+      else {
+        return callback(new Error(body.error));
+      }
+    }
+
+    logger.debug('retrieved %d counts', body.downloads.length);
+
+    // body.downloads is a list of Statistics, but it's not very useful because
+    // it might be missing dates.
+    var downloads: {[day: string]: number} = {};
+    body.downloads.forEach((statistic: Statistic) => { downloads[statistic.day] = statistic.downloads });
+
+    // The start/end in the response should be identical to the start/end we
+    // sent. Should we check?
+    var statistics: Statistic[] = [];
+    // Use start as a cursor for all the days we want to fill
+    while (!start.isAfter(end)) {
+      var day = start.format('YYYY-MM-DD');
+      statistics.push({day: day, downloads: downloads[day] || downloads_default});
+      start.add(1, 'day');
+    }
+
+    callback(null, statistics);
+  });
+}
+
+/**
+Given a list of the statistics (pre-sorted from earliest to latest), return the
+start and end dates (moments) of the next batch that we should request.
+*/
+function determineNeededEndpoints(statistics: Statistic[], range_days: number): [moment.Moment, moment.Moment] {
+  // default to starting with the most recent period
+  var end = moment.utc();
+  // but NPM download counts are not available until after the day is over.
+  end.subtract(1, 'day');
+  // they're updated shortly after the UTC day is over. To be safe, we'll
+  // assume that 2015-05-20 counts are available as of 2015-05-21 at 6am (UTC),
+  // so if it's currently before 6am, we'll go back another day.
+  if (end.hour() < 6) {
+    end.subtract(1, 'day');
+  }
+  // set the start point to however many days back
+  var start = end.clone().subtract(range_days, 'days');
+  // but if getting the most recent batch overlaps with what we already have...
+  var latest = statistics[statistics.length - 1] || {day: NPM_EPOCH, downloads: -1};
+  if (start.isBefore(moment.utc(latest.day))) {
+    // ...then set the endpoints to the most recent period preceding all of the
+    // data we currently have.
+    // if we're in this conditional, statistics is sure to be non-empty
+    var earliest = statistics[0];
+    // and we work backwards from the earliest date we do have
+    end = moment.utc(earliest.day).subtract(1, 'day');
+    start = end.clone().subtract(range_days, 'days');
+  }
+  // TODO: fill in the gaps somehow?
+  return [start, end];
+}
+
+/**
+Iterate through the given statistics, which should be sorted from earliest to
+latest, and return the number of statistics at the beginning where the downloads
+count is -1 (meaning, invalid).
+*/
+function countMissingStatistics(statistics: Statistic[]): number {
+  var missing = 0;
+  for (var length = statistics.length; missing < length; missing++) {
+    if (statistics[missing].downloads > -1) {
+      break;
+    }
+  }
+  return missing;
+}
+
+function getPackageStatistics(name: string, range_days: number,
+                              callback: (error: Error, statistics?: Statistic[]) => void) {
   findOrCreatePackage(name, (error: Error, package: Package) => {
     if (error) return callback(error);
 
@@ -74,69 +178,29 @@ function getPackageStatistics(name: string, callback: (error: Error, statistics?
     .orderBy('day')
     .execute((error: Error, local_statistics: Statistic[]) => {
       if (error) return callback(error);
-      // 2. determine what we want to get
-      var local_earliest = local_statistics[0];
-      var local_latest = local_statistics[local_statistics.length - 1];
-      // NPM download counts are not available until after the day is over.
-      var remote_latest = moment.utc().subtract(1, 'day');
-      // and they're updated shortly after the UTC day is over. To be safe,
-      // we'll assume that 2015-05-20 counts are available as of 2015-05-21 at
-      // 6am (UTC), so if it's before 6am, we'll go back another day
-      if (remote_latest.hour() < 6) {
-        remote_latest.subtract(1, 'day');
+
+      // 2. determine whether we seem to have gathered all stats for the package
+      var missing = countMissingStatistics(local_statistics);
+      // if we've fetched more than half a year of invalid counts, we assume
+      // that we've exhausted the available data, and don't ask for any more.
+      if (missing > 180) {
+        logger.debug('not fetching any more data for "%s"', name);
+        return callback(null, local_statistics);
       }
-      var end;
-      if (local_latest === undefined || remote_latest.diff(moment.utc(local_latest.day), 'days') > RANGE_DAYS) {
-        // 3a. if we don't have any of the most recent 31 days, start with those
-        end = remote_latest;
-      }
-      else {
-        // 3b. otherwise, work backwards from the earliest date we do have
-        end = moment.utc(local_earliest.day).subtract(1, 'day');
-      }
-      var start = end.clone().subtract(RANGE_DAYS, 'days');
-      // TODO: fill in the gaps somehow
+
+      // 3. determine what we want to get next
+      var [start, end] = determineNeededEndpoints(local_statistics, range_days);
 
       // 4. get the next unseen statistics
-      var url = `https://api.npmjs.org/downloads/range/${start.format('YYYY-MM-DD')}:${end.format('YYYY-MM-DD')}/${name}`;
-      logger.debug('requesting url: %s', url);
-      request.get({url: url, json: true}, (error, response, body) => {
+      getRangeStatistics(name, start, end, (error, statistics) => {
         if (error) return callback(error);
-
-        var downloads_default = 0;
-
-        if (body.error) {
-          // we'll consider "no stats for this package for this range (0008)" a
-          // non-fatal error, so that we can keep going
-          if (body.error == "no stats for this package for this range (0008)") {
-            body.downloads = [];
-            downloads_default = -1;
-          }
-          else {
-            return callback(new Error(body.error));
-          }
-        }
-        // body.downloads is a list of Statistics, but not very useful because
-        // it might be missing dates.
-        var downloads: {[day: string]: number} = {};
-        body.downloads.forEach((statistic: Statistic) => { downloads[statistic.day] = statistic.downloads });
-
-        logger.debug('retrieved %d counts', body.downloads.length);
-
-        // the start/end in the response should be identical to the start/end we sent
-        var statistics: Statistic[] = [];
-        // use start as a cursor for all the days we want to fill
-        while (!start.isAfter(end)) {
-          var day = start.format('YYYY-MM-DD');
-          statistics.push({day: day, downloads: downloads[day] || downloads_default});
-          start.add(1, 'day');
-        }
 
         // 5. save the values we just fetched
         var [sql, args] = buildMultirowInsert(package.id, statistics);
         db.executeSQL(sql, args, (error: Error) => {
           if (error) return callback(error);
-          // merge local and new statistics
+
+          // 6. merge local and new statistics for the response
           Array.prototype.unshift.apply(local_statistics, statistics);
           callback(null, local_statistics);
         });
@@ -152,14 +216,14 @@ class Controller {
       logger.debug('%s %s', req.method, req.url);
       var package_downloads_match = req.url.match(/^\/packages\/(.+)\/downloads$/);
       if (package_downloads_match) {
-        getPackageStatistics(package_downloads_match[1], (error: Error, statistics?: Statistic[]) => {
+        getPackageStatistics(package_downloads_match[1], 180, (error: Error, statistics?: Statistic[]) => {
           if (error) {
             res.statusCode = 500;
-            return res.end(`getPackageStatistics error: ${error.message}`);
+            return res.end(`error getting package statistics: ${error.message}`);
           }
           res.setHeader('Content-Type', 'application/json');
           if (req.method == 'HEAD') {
-            return res.end('');
+            return res.end();
           }
           var result = statistics.map(statistic => {
             return {
