@@ -214,9 +214,12 @@ class Controller {
   constructor() {
     this.server = http.createServer((req, res) => {
       logger.debug('%s %s', req.method, req.url);
-      var package_downloads_match = req.url.match(/^\/packages\/(.+)\/downloads$/);
+      var package_downloads_match = req.url.match(/^\/packages\/(.*)\/downloads$/);
       if (package_downloads_match) {
-        getPackageStatistics(package_downloads_match[1], 180, (error: Error, statistics?: Statistic[]) => {
+        var name = package_downloads_match[1];
+        // take it easy on the NPM API server for all-packages requests
+        var range_days = (name == '') ? 10 : 180;
+        getPackageStatistics(name, range_days, (error, statistics) => {
           if (error) {
             res.statusCode = 500;
             return res.end(`error getting package statistics: ${error.message}`);
@@ -236,7 +239,7 @@ class Controller {
       }
       else {
         res.statusCode = 404;
-        res.end('Not found');
+        res.end('Not found\n');
       }
     });
 

@@ -181,9 +181,12 @@ var Controller = (function () {
     function Controller() {
         this.server = http.createServer(function (req, res) {
             logger.debug('%s %s', req.method, req.url);
-            var package_downloads_match = req.url.match(/^\/packages\/(.+)\/downloads$/);
+            var package_downloads_match = req.url.match(/^\/packages\/(.*)\/downloads$/);
             if (package_downloads_match) {
-                getPackageStatistics(package_downloads_match[1], 180, function (error, statistics) {
+                var name = package_downloads_match[1];
+                // take it easy on the NPM API server for all-packages requests
+                var range_days = (name == '') ? 10 : 180;
+                getPackageStatistics(name, range_days, function (error, statistics) {
                     if (error) {
                         res.statusCode = 500;
                         return res.end("error getting package statistics: " + error.message);
@@ -203,7 +206,7 @@ var Controller = (function () {
             }
             else {
                 res.statusCode = 404;
-                res.end('Not found');
+                res.end('Not found\n');
             }
         });
         this.server.on('listening', function () { return logger.info('server listening'); });
