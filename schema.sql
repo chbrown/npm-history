@@ -10,3 +10,8 @@ CREATE TABLE statistic (
 
   UNIQUE (package_id, day)
 );
+
+CREATE VIEW package_statistic AS
+  SELECT name, day, downloads
+  FROM statistic
+  INNER JOIN package ON package.id = statistic.package_id;
