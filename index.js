@@ -181,6 +181,9 @@ var Controller = (function () {
     function Controller() {
         this.server = http.createServer(function (req, res) {
             logger.debug('%s %s', req.method, req.url);
+            // enable CORS
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', '*');
             var package_downloads_match = req.url.match(/^\/packages\/(.*)\/downloads$/);
             if (package_downloads_match) {
                 var name = package_downloads_match[1];
