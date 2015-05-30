@@ -27,9 +27,9 @@
     "typescript": "*"
   },
   "bin": {
-    "npm-history": "bin/npm-history"
+    "npm-history": "bin"
   },
   "scripts": {
-    "start": "node bin/npm-history"
+    "start": "node bin"
   }
 }

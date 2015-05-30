@@ -216,7 +216,7 @@ var Controller = (function () {
     };
     return Controller;
 })();
-function cli() {
+function main() {
     var argvparser = yargs
         .usage('Usage: npm-history -p 80')
         .describe({
@@ -256,4 +256,4 @@ function cli() {
         });
     }
 }
-exports.cli = cli;
+exports.main = main;
