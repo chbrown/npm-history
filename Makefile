@@ -1,10 +1,9 @@
-SHELL := bash
 BIN := node_modules/.bin
 DTS := async/async moment/moment node/node form-data/form-data request/request yargs/yargs
 
 all: index.js
-
 type_declarations: $(DTS:%=type_declarations/DefinitelyTyped/%.d.ts)
+
 type_declarations/DefinitelyTyped/%:
 	mkdir -p $(@D)
 	curl -s https://raw.githubusercontent.com/chbrown/DefinitelyTyped/master/$* > $@
