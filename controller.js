@@ -1,5 +1,6 @@
 /// <reference path="type_declarations/index.d.ts" />
 var url = require('url');
+var moment = require('moment');
 var Router = require('regex-router');
 var database_1 = require('./database');
 var R = new Router();
