@@ -3,6 +3,7 @@ var url = require('url');
 var moment = require('moment');
 var Router = require('regex-router');
 var database_1 = require('./database');
+var package_json = require('./package.json');
 var R = new Router();
 /**
 HEAD|GET /packages/:name/downloads
@@ -58,5 +59,20 @@ R.get(/^\/packages\/averages/, function (req, res) {
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify(packages) + '\n');
     });
+});
+/** GET /info
+Show npm-history package metadata
+*/
+R.get(/^\/info$/, function (req, res, m) {
+    var info = {
+        name: package_json.name,
+        version: package_json.version,
+        description: package_json.description,
+        homepage: package_json.homepage,
+        author: package_json.author,
+        license: package_json.license,
+    };
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(info) + '\n');
 });
 exports.controller = R;
