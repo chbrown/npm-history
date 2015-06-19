@@ -1,6 +1,6 @@
 {
   "name": "npm-history",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "NPM download-counts API client with permanent cache",
   "keywords": [
     "npm",
