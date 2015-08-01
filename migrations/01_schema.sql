@@ -11,6 +11,8 @@ CREATE TABLE statistic (
   UNIQUE (package_id, day)
 );
 
+CREATE INDEX statistic_day_idx ON statistic(day);
+
 CREATE VIEW package_statistic AS
   SELECT name, day, downloads
   FROM statistic
