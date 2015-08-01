@@ -15,8 +15,8 @@
   "dependencies": {
     "async": "*",
     "http-enhanced": "*",
-    "loge": "*",
-    "moment": "*",
+    "loge": "^1.0.1",
+    "moment": "2.10.3",
     "regex-router": "*",
     "request": "*",
     "sqlcmd-pg": "*",
@@ -27,9 +27,9 @@
     "typescript": "*"
   },
   "bin": {
-    "npm-history": "bin"
+    "npm-history": "bin/npm-history"
   },
   "scripts": {
-    "start": "node bin"
+    "start": "node bin/npm-history"
   }
 }

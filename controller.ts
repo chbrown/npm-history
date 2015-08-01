@@ -23,8 +23,8 @@ Returns all saved downloads for that package as JSON, unless called with HEAD.
 R.any(/^\/packages\/(.*)\/downloads$/, (req, res, match) => {
   var name = match[1];
   // take it easy on the NPM API server for all-packages requests
-  var range_days = (name == '') ? 10 : 180;
-  getPackageStatistics(name, range_days, (error, statistics) => {
+  var [min_range_days, max_range_days] = (name == '') ? [5, 10] : [30, 180];
+  getPackageStatistics(name, min_range_days, max_range_days, (error, statistics) => {
     if (error) {
       res.statusCode = 500;
       return res.end(`error getting package statistics: ${error.message}`);

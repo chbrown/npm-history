@@ -2,8 +2,7 @@
 import path = require('path');
 import http = require('http');
 import yargs = require('yargs');
-
-var logger = require('loge');
+import {logger, Level} from 'loge';
 
 import {db} from './database';
 import {controller} from './controller';
@@ -43,7 +42,7 @@ export function main() {
     .boolean(['help', 'verbose', 'version']);
 
   var argv = argvparser.argv;
-  logger.level = argv.verbose ? 'debug' : 'info';
+  logger.level = argv.verbose ? Level.debug : Level.info;
 
   if (argv.help) {
     yargs.showHelp();
@@ -54,8 +53,10 @@ export function main() {
   else {
     db.createDatabaseIfNotExists(error => {
       if (error) throw error;
-      db.executePatches('_migrations', __dirname, error => {
+
+      db.executePatches('_migrations', path.join(__dirname, 'migrations'), error => {
         if (error) throw error;
+
         server.listen(argv.port, argv.hostname);
       });
     });

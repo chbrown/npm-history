@@ -2,9 +2,9 @@
 import http = require('http');
 import request = require('request');
 import moment = require('moment');
+import {logger} from 'loge';
 
 var sqlcmd = require('sqlcmd-pg');
-var logger = require('loge');
 
 interface Package {
   id: number;
@@ -13,7 +13,7 @@ interface Package {
 
 interface Statistic {
   package_id?: number;
-  day: string;
+  day: Date;
   downloads: number;
 }
 
@@ -30,7 +30,7 @@ db.on('log', function(ev) {
   logger[ev.level].apply(logger, args);
 });
 
-const NPM_EPOCH = '2009-09-29';
+const NPM_EPOCH = new Date('2009-09-29');
 
 /**
 Custom-built 'INSERT INTO <table> (<columns>) VALUES (<row1>), (<row2>), ...;'
@@ -68,6 +68,14 @@ function findOrCreatePackage(name: string, callback: (error: Error, package?: Pa
   });
 }
 
+interface DownloadsRangeResponse {
+  downloads: {day: string, downloads: number}[];
+  start: string;
+  end: string;
+  package: string;
+  error?: string;
+}
+
 /**
 Given a package name (string) and start/end dates, call out to the NPM API
 download-counts endpoint for that range. Collect these into a proper array of
@@ -77,7 +85,7 @@ function getRangeStatistics(name: string, start: moment.Moment, end: moment.Mome
                             callback: (error: Error, statistics?: Statistic[]) => void) {
   var url = `https://api.npmjs.org/downloads/range/${start.format('YYYY-MM-DD')}:${end.format('YYYY-MM-DD')}/${name}`;
   logger.debug('fetching "%s"', url);
-  request.get({url: url, json: true}, (error: Error, response: http.IncomingMessage, body: any) => {
+  request.get({url: url, json: true}, (error: Error, response: http.IncomingMessage, body: DownloadsRangeResponse) => {
     if (error) return callback(error);
 
     var downloads_default = 0;
@@ -100,7 +108,7 @@ function getRangeStatistics(name: string, start: moment.Moment, end: moment.Mome
     // body.downloads is a list of Statistics, but it's not very useful because
     // it might be missing dates.
     var downloads: {[day: string]: number} = {};
-    body.downloads.forEach((statistic: Statistic) => { downloads[statistic.day] = statistic.downloads });
+    body.downloads.forEach(download => downloads[download.day] = download.downloads);
 
     // The start/end in the response should be identical to the start/end we
     // sent. Should we check?
@@ -108,44 +116,15 @@ function getRangeStatistics(name: string, start: moment.Moment, end: moment.Mome
     // Use start as a cursor for all the days we want to fill
     while (!start.isAfter(end)) {
       var day = start.format('YYYY-MM-DD');
-      statistics.push({day: day, downloads: downloads[day] || downloads_default});
+      statistics.push({
+        day: start.clone().toDate(),
+        downloads: downloads[day] || downloads_default,
+      });
       start.add(1, 'day');
     }
 
     callback(null, statistics);
   });
-}
-
-/**
-Given a list of the statistics (pre-sorted from earliest to latest), return the
-start and end dates (moments) of the next batch that we should request.
-*/
-function determineNeededEndpoints(statistics: Statistic[], range_days: number): [moment.Moment, moment.Moment] {
-  // default to starting with the most recent period
-  var end = moment.utc();
-  // but NPM download counts are not available until after the day is over.
-  end.subtract(1, 'day');
-  // they're updated shortly after the UTC day is over. To be safe, we'll
-  // assume that 2015-05-20 counts are available as of 2015-05-21 at 6am (UTC),
-  // so if it's currently before 6am, we'll go back another day.
-  if (end.hour() < 6) {
-    end.subtract(1, 'day');
-  }
-  // set the start point to however many days back
-  var start = end.clone().subtract(range_days, 'days');
-  // but if getting the most recent batch overlaps with what we already have...
-  var latest = statistics[statistics.length - 1] || {day: NPM_EPOCH, downloads: -1};
-  if (start.isBefore(moment.utc(latest.day))) {
-    // ...then set the endpoints to the most recent period preceding all of the
-    // data we currently have.
-    // if we're in this conditional, statistics is sure to be non-empty
-    var earliest = statistics[0];
-    // and we work backwards from the earliest date we do have
-    end = moment.utc(earliest.day).subtract(1, 'day');
-    start = end.clone().subtract(range_days, 'days');
-  }
-  // TODO: fill in the gaps somehow?
-  return [start, end];
 }
 
 /**
@@ -163,8 +142,73 @@ function countMissingStatistics(statistics: Statistic[]): number {
   return missing;
 }
 
-export function getPackageStatistics(name: string, range_days: number,
-                              callback: (error: Error, statistics?: Statistic[]) => void) {
+/**
+Given a list of the statistics (pre-sorted from earliest to latest), return the
+start and end dates (moments) of the next batch that we should request.
+
+The returned endpoints should be inclusive, since the API takes inclusive
+endpoint. I.e., we'll fetch the downloads for each of the bounding days as well
+as all the days in between.
+
+what we have:                           |now
+               000000XXXXXXXXXXXXXXXXX??|        => fetch (case 1)
+                                  ??????|        => fetch (case 1)
+                    ??????XXXXXXXXXXXXXX|        => fetch (case 2)
+               000000XXXXXXXXXXXXXXXXXXX|        => do nothing (case 3)
+
+X = valid looking count
+0 = invalid count
+Each character represents 1 month or so.
+*/
+function determineNeededEndpoints(statistics: Statistic[],
+                                  min_range_days: number,
+                                  max_range_days: number): [moment.Moment, moment.Moment] {
+  var latest_statistic = statistics[statistics.length - 1] || {day: NPM_EPOCH, downloads: -1};
+  var latest = moment.utc(latest_statistic.day);
+  // default to starting with the most recent period
+  var now = moment.utc();
+  // but NPM download counts are not available until after the day is over.
+  now.subtract(1, 'day');
+  // and they're updated shortly after the UTC day is over. To be safe, we'll
+  // assume that 2015-05-20 counts are available as of 2015-05-21 at 6am (UTC),
+  // so if it's currently before 6am, we'll go back another day to be safe.
+  if (now.hour() < 6) {
+    now.subtract(1, 'day');
+  }
+  // case 1) if there at least `min_range_days` missing since the latest
+  // statistic we've fetched, we fetch from the latest to the current day
+  // e.g.: today.diff(two_days_ago, 'days') => 2
+  if (now.diff(latest, 'days') >= min_range_days) {
+    // set the end point to `max_range_days` after the latest fetched statistic,
+    // back, but don't reach into the future.
+    var start = latest.clone().add(1, 'days');
+    var end = moment.min([start.clone().add(max_range_days - 1, 'days'), now]);
+    return [start, end];
+  }
+  else {
+    // otherwise, we fill in the backlog
+    var backlog_exhausted = countMissingStatistics(statistics) > 180;
+    // case 3) if we've fetched more than half a year of invalid counts, we assume
+    // that we've exhausted the available data going back, and won't ask for any more.
+    if (backlog_exhausted) {
+      return [null, null];
+    }
+    // case 2) set the endpoints to the most recent period preceding all of the
+    // data we currently have.
+    // if we've gotten to this point, statistics is sure to be non-empty
+    var earliest = moment.utc(statistics[0].day);
+    // we work backwards from the earliest date we do have, setting the end to
+    // the day preceding the earliest day we've collected so far
+    var end = earliest.subtract(1, 'day');
+    var start = end.clone().subtract(max_range_days - 1, 'days');
+    return [start, end];
+  }
+}
+
+export function getPackageStatistics(name: string,
+                                     min_range_days: number,
+                                     max_range_days: number,
+                                     callback: (error: Error, statistics?: Statistic[]) => void) {
   findOrCreatePackage(name, (error: Error, package: Package) => {
     if (error) return callback(error);
 
@@ -176,17 +220,15 @@ export function getPackageStatistics(name: string, range_days: number,
     .execute((error: Error, local_statistics: Statistic[]) => {
       if (error) return callback(error);
 
-      // 2. determine whether we seem to have gathered all stats for the package
-      var missing = countMissingStatistics(local_statistics);
-      // if we've fetched more than half a year of invalid counts, we assume
-      // that we've exhausted the available data, and don't ask for any more.
-      if (missing > 180) {
-        logger.debug('not fetching any more data for "%s"', name);
+      // 2. determine what we want to get next
+      var [start, end] = determineNeededEndpoints(local_statistics, min_range_days, max_range_days);
+
+      // 3. determineNeededEndpoints may return [null, null] if there are no
+      // remaining ranges that we need to fetch
+      if (start === null && end === null) {
+        logger.debug('not fetching any data for "%s"', name);
         return callback(null, local_statistics);
       }
-
-      // 3. determine what we want to get next
-      var [start, end] = determineNeededEndpoints(local_statistics, range_days);
 
       // 4. get the next unseen statistics
       getRangeStatistics(name, start, end, (error, statistics) => {
@@ -198,8 +240,8 @@ export function getPackageStatistics(name: string, range_days: number,
           if (error) return callback(error);
 
           // 6. merge local and new statistics for the response
-          Array.prototype.unshift.apply(local_statistics, statistics);
-          callback(null, local_statistics);
+          var total_statistics = statistics.concat(local_statistics).sort((a, b) => <any>a.day - <any>b.day);
+          callback(null, total_statistics);
         });
       });
     });

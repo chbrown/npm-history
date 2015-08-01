@@ -1,10 +1,12 @@
+/// <reference path="type_declarations/index.d.ts" />
+var path = require('path');
 var http = require('http');
 var yargs = require('yargs');
-var logger = require('loge');
+var loge_1 = require('loge');
 var database_1 = require('./database');
 var controller_1 = require('./controller');
 var server = http.createServer(function (req, res) {
-    logger.debug('%s %s', req.method, req.url);
+    loge_1.logger.debug('%s %s', req.method, req.url);
     // enable CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', '*');
@@ -12,7 +14,7 @@ var server = http.createServer(function (req, res) {
 });
 server.on('listening', function () {
     var address = server.address();
-    logger.info("server listening on http://" + address.address + ":" + address.port);
+    loge_1.logger.info("server listening on http://" + address.address + ":" + address.port);
 });
 server['timeout'] = 10 * 60 * 1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
 function main() {
@@ -36,7 +38,7 @@ function main() {
     })
         .boolean(['help', 'verbose', 'version']);
     var argv = argvparser.argv;
-    logger.level = argv.verbose ? 'debug' : 'info';
+    loge_1.logger.level = argv.verbose ? loge_1.Level.debug : loge_1.Level.info;
     if (argv.help) {
         yargs.showHelp();
     }
@@ -47,7 +49,7 @@ function main() {
         database_1.db.createDatabaseIfNotExists(function (error) {
             if (error)
                 throw error;
-            database_1.db.executePatches('_migrations', __dirname, function (error) {
+            database_1.db.executePatches('_migrations', path.join(__dirname, 'migrations'), function (error) {
                 if (error)
                     throw error;
                 server.listen(argv.port, argv.hostname);
