@@ -40,9 +40,10 @@ the number of parameters you can have in a prepared query.
 function buildMultirowInsert(package_id: number, statistics: Statistic[]) {
   var args: any[] = [package_id];
   var tuples: string[] = statistics.map(statistic => {
+    var day_string = moment.utc(statistic.day).format('YYYY-MM-DD');
     var tuple = [
       '$1',
-      '$' + args.push(statistic.day),
+      '$' + args.push(day_string),
       '$' + args.push(statistic.downloads),
     ];
     return `(${tuple.join(', ')})`;
@@ -54,7 +55,7 @@ function buildMultirowInsert(package_id: number, statistics: Statistic[]) {
 Given a package name, return the full package row from the database, creating
 one if needed.
 */
-function findOrCreatePackage(name: string, callback: (error: Error, package?: Package) => void) {
+function findOrCreatePackage(name: string, callback: (error: Error, package_row?: Package) => void) {
   db.Select('package')
   .whereEqual({name: name})
   .execute((error: Error, rows: Package[]) => {
@@ -209,13 +210,13 @@ export function getPackageStatistics(name: string,
                                      min_range_days: number,
                                      max_range_days: number,
                                      callback: (error: Error, statistics?: Statistic[]) => void) {
-  findOrCreatePackage(name, (error: Error, package: Package) => {
+  findOrCreatePackage(name, (error: Error, package_row: Package) => {
     if (error) return callback(error);
 
     // 1. find what dates we have so far
     db.Select('statistic')
     .add('day', 'downloads')
-    .whereEqual({package_id: package.id})
+    .whereEqual({package_id: package_row.id})
     .orderBy('day')
     .execute((error: Error, local_statistics: Statistic[]) => {
       if (error) return callback(error);
@@ -235,7 +236,7 @@ export function getPackageStatistics(name: string,
         if (error) return callback(error);
 
         // 5. save the values we just fetched
-        var [sql, args] = buildMultirowInsert(package.id, statistics);
+        var [sql, args] = buildMultirowInsert(package_row.id, statistics);
         db.executeSQL(sql, args, (error: Error) => {
           if (error) return callback(error);
 

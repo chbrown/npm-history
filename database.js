@@ -22,9 +22,10 @@ the number of parameters you can have in a prepared query.
 function buildMultirowInsert(package_id, statistics) {
     var args = [package_id];
     var tuples = statistics.map(function (statistic) {
+        var day_string = moment.utc(statistic.day).format('YYYY-MM-DD');
         var tuple = [
             '$1',
-            '$' + args.push(statistic.day),
+            '$' + args.push(day_string),
             '$' + args.push(statistic.downloads),
         ];
         return "(" + tuple.join(', ') + ")";
@@ -169,13 +170,13 @@ function determineNeededEndpoints(statistics, min_range_days, max_range_days) {
     }
 }
 function getPackageStatistics(name, min_range_days, max_range_days, callback) {
-    findOrCreatePackage(name, function (error, package) {
+    findOrCreatePackage(name, function (error, package_row) {
         if (error)
             return callback(error);
         // 1. find what dates we have so far
         exports.db.Select('statistic')
             .add('day', 'downloads')
-            .whereEqual({ package_id: package.id })
+            .whereEqual({ package_id: package_row.id })
             .orderBy('day')
             .execute(function (error, local_statistics) {
             if (error)
@@ -193,7 +194,7 @@ function getPackageStatistics(name, min_range_days, max_range_days, callback) {
                 if (error)
                     return callback(error);
                 // 5. save the values we just fetched
-                var _a = buildMultirowInsert(package.id, statistics), sql = _a[0], args = _a[1];
+                var _a = buildMultirowInsert(package_row.id, statistics), sql = _a[0], args = _a[1];
                 exports.db.executeSQL(sql, args, function (error) {
                     if (error)
                         return callback(error);
