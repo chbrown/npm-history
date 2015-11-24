@@ -1,4 +1,3 @@
-/// <reference path="type_declarations/index.d.ts" />
 var path = require('path');
 var http = require('http');
 var yargs = require('yargs');

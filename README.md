@@ -34,4 +34,4 @@ It is controlled by a minimal `HTTP` API.
 
 ## License
 
-Copyright 2015 Christopher Brown. [MIT Licensed](http://opensource.org/licenses/MIT).
+Copyright 2015 Christopher Brown. [MIT Licensed](http://chbrown.github.io/licenses/MIT/#2015).

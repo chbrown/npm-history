@@ -1,7 +1,6 @@
-/// <reference path="type_declarations/index.d.ts" />
-import url = require('url');
-import moment = require('moment');
-import Router = require('regex-router');
+import * as url from 'url';
+import * as moment from 'moment';
+import Router from 'regex-router';
 
 import {getPackageStatistics, queryAverageDownloads} from './database';
 

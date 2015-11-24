@@ -9,13 +9,16 @@
     "history"
   ],
   "homepage": "https://github.com/chbrown/npm-history",
-  "repository": "git://github.com/chbrown/npm-history.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chbrown/npm-history.git"
+  },
   "license": "MIT",
   "author": "Christopher Brown <io@henrian.com> (http://henrian.com)",
   "dependencies": {
     "async": "*",
     "http-enhanced": "*",
-    "loge": "^1.0.1",
+    "loge": "*",
     "moment": "*",
     "regex-router": "*",
     "request": "*",
@@ -24,7 +27,8 @@
     "yargs": "*"
   },
   "devDependencies": {
-    "typescript": "*"
+    "declarations": "*",
+    "typescript": "next"
   },
   "bin": {
     "npm-history": "bin/npm-history"

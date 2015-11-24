@@ -1,10 +1,9 @@
-/// <reference path="type_declarations/index.d.ts" />
 var url = require('url');
 var moment = require('moment');
-var Router = require('regex-router');
+var regex_router_1 = require('regex-router');
 var database_1 = require('./database');
 var package_json = require('./package.json');
-var R = new Router();
+var R = new regex_router_1.default();
 /**
 HEAD|GET /packages/:name/downloads
 

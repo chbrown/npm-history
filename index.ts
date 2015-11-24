@@ -1,7 +1,6 @@
-/// <reference path="type_declarations/index.d.ts" />
-import path = require('path');
-import http = require('http');
-import yargs = require('yargs');
+import * as path from 'path';
+import * as http from 'http';
+import * as yargs from 'yargs';
 import {logger, Level} from 'loge';
 
 import {db} from './database';

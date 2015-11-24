@@ -1,7 +1,6 @@
-/// <reference path="type_declarations/index.d.ts" />
-import http = require('http');
-import request = require('request');
-import moment = require('moment');
+import * as http from 'http';
+import * as request from 'request';
+import * as moment from 'moment';
 import {logger} from 'loge';
 
 var sqlcmd = require('sqlcmd-pg');
@@ -183,7 +182,7 @@ function determineNeededEndpoints(statistics: Statistic[],
     // set the end point to `max_range_days` after the latest fetched statistic,
     // back, but don't reach into the future.
     var start = latest.clone().add(1, 'days');
-    var end = moment.min([start.clone().add(max_range_days - 1, 'days'), now]);
+    var end = moment.min(start.clone().add(max_range_days - 1, 'days'), now);
     return [start, end];
   }
   else {

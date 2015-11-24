@@ -147,7 +147,7 @@ function determineNeededEndpoints(statistics, min_range_days, max_range_days) {
         // set the end point to `max_range_days` after the latest fetched statistic,
         // back, but don't reach into the future.
         var start = latest.clone().add(1, 'days');
-        var end = moment.min([start.clone().add(max_range_days - 1, 'days'), now]);
+        var end = moment.min(start.clone().add(max_range_days - 1, 'days'), now);
         return [start, end];
     }
     else {
