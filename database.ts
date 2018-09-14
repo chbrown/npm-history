@@ -239,7 +239,7 @@ export function getPackageStatistics(name: string,
           if (sqlError) return callback(sqlError)
 
           // 6. merge local and new statistics for the response
-          const total_statistics = statistics.concat(local_statistics).sort((a, b) => a.day as any - b.day as any)
+          const total_statistics = statistics.concat(local_statistics).sort((a, b) => a.day.getTime() - b.day.getTime())
           callback(null, total_statistics)
         })
       })
