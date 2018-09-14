@@ -15,8 +15,9 @@ var server = http.createServer((req, res) => {
   controller.route(req, res);
 });
 server.on('listening', () => {
-  var address = server.address();
-  logger.info(`server listening on http://${address.address}:${address.port}`);
+  const address = server.address();
+  const addressString = typeof address == 'string' ? address : `${address.address}:${address.port}`;
+  logger.info('server listening on http://%s', addressString);
 });
 server['timeout'] = 10*60*1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
 
