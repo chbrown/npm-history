@@ -2,8 +2,7 @@ import * as http from 'http';
 import * as request from 'request';
 import * as moment from 'moment';
 import {logger} from 'loge';
-
-var sqlcmd = require('sqlcmd-pg');
+import {Connection} from 'sqlcmd-pg';
 
 interface Package {
   id: number;
@@ -16,10 +15,9 @@ interface Statistic {
   downloads: number;
 }
 
-export const db = new sqlcmd.Connection({
+export const db = new Connection({
   host: '127.0.0.1',
-  port: '5432',
-  user: 'postgres',
+  port: 5432,
   database: 'npm-history',
 });
 
