@@ -1,25 +1,25 @@
-import * as path from 'path';
-import * as http from 'http';
-import * as optimist from 'optimist';
-import {logger, Level} from 'loge';
-import {executePatches} from 'sql-patch';
+import * as path from 'path'
+import * as http from 'http'
+import * as optimist from 'optimist'
+import {logger, Level} from 'loge'
+import {executePatches} from 'sql-patch'
 
-import {db} from './database';
-import {controller} from './controller';
+import {db} from './database'
+import {controller} from './controller'
 
 const server = http.createServer((req, res) => {
-  logger.debug('%s %s', req.method, req.url);
+  logger.debug('%s %s', req.method, req.url)
   // enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', '*');
-  controller.route(req, res);
-});
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', '*')
+  controller.route(req, res)
+})
 server.on('listening', () => {
-  const address = server.address();
-  const addressString = typeof address == 'string' ? address : `${address.address}:${address.port}`;
-  logger.info('server listening on http://%s', addressString);
-});
-server.timeout = 10 * 60 * 1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
+  const address = server.address()
+  const addressString = typeof address == 'string' ? address : `${address.address}:${address.port}`
+  logger.info('server listening on http://%s', addressString)
+})
+server.timeout = 10 * 60 * 1000 // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
 
 export function main() {
   const argvparser = optimist
@@ -40,26 +40,26 @@ export function main() {
       hostname: process.env.HOSTNAME || '127.0.0.1',
       port: parseInt(process.env.PORT, 10) || 8080,
     })
-    .boolean(['help', 'verbose', 'version']);
+    .boolean(['help', 'verbose', 'version'])
 
-  const argv = argvparser.argv;
-  logger.level = argv.verbose ? Level.debug : Level.info;
+  const argv = argvparser.argv
+  logger.level = argv.verbose ? Level.debug : Level.info
 
   if (argv.help) {
-    argvparser.showHelp();
+    argvparser.showHelp()
   }
   else if (argv.version) {
-    console.log(require('./package').version);
+    console.log(require('./package').version)
   }
   else {
     db.createDatabaseIfNotExists(error => {
-      if (error) throw error;
+      if (error) throw error
 
       executePatches(db, '_migrations', path.join(__dirname, 'migrations'), patchError => {
-        if (patchError) throw patchError;
+        if (patchError) throw patchError
 
-        server.listen(argv.port, argv.hostname);
-      });
-    });
+        server.listen(argv.port, argv.hostname)
+      })
+    })
   }
 }

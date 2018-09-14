@@ -14,8 +14,8 @@ It is controlled by a minimal `HTTP` API.
   ```javascript
   [
     {
-      day: string; // formatted as 'YYYY-MM-DD'),
-      downloads: number;
+      day: string, // formatted as 'YYYY-MM-DD'),
+      downloads: number,
     },
     ...
   ]
