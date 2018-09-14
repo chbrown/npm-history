@@ -34,6 +34,7 @@
     "npm-history": "bin/npm-history"
   },
   "scripts": {
+    "prepare": "tsc",
     "start": "node bin/npm-history"
   }
 }
