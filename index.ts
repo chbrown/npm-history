@@ -1,6 +1,6 @@
 import * as path from 'path';
 import * as http from 'http';
-import * as yargs from 'yargs';
+import * as optimist from 'optimist';
 import {logger, Level} from 'loge';
 
 import {db} from './database';
@@ -20,7 +20,7 @@ server.on('listening', () => {
 server['timeout'] = 10*60*1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
 
 export function main() {
-  var argvparser = yargs
+  var argvparser = optimist
     .usage('Usage: npm-history -p 80')
     .describe({
       hostname: 'hostname to listen on',
@@ -44,7 +44,7 @@ export function main() {
   logger.level = argv.verbose ? Level.debug : Level.info;
 
   if (argv.help) {
-    yargs.showHelp();
+    argvparser.showHelp();
   }
   else if (argv.version) {
     console.log(require('./package').version);

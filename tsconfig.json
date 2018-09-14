@@ -8,7 +8,7 @@
     "node_modules/declarations/moment/moment-node.d.ts",
     "node_modules/declarations/node/node.d.ts",
     "node_modules/declarations/request/request.d.ts",
-    "node_modules/declarations/yargs/yargs.d.ts",
+    "node_modules/declarations/optimist/optimist.d.ts",
     "controller.ts",
     "database.ts",
     "index.ts"

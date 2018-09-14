@@ -20,11 +20,11 @@
     "http-enhanced": "*",
     "loge": "*",
     "moment": "*",
+    "optimist": "*",
     "regex-router": "*",
     "request": "*",
     "sqlcmd-pg": "*",
-    "streaming": "*",
-    "yargs": "*"
+    "streaming": "*"
   },
   "devDependencies": {
     "declarations": "*",
