@@ -34,7 +34,7 @@ Custom-built 'INSERT INTO <table> (<columns>) VALUES (<row1>), (<row2>), ...;'
 SQL query for inserting statistic rows. I don't think there are any limits on
 the number of parameters you can have in a prepared query.
 */
-function buildMultirowInsert(package_id: number, statistics: Statistic[]) {
+function buildMultirowInsert(package_id: number, statistics: Statistic[]): [string, any[]] {
   var args: any[] = [package_id];
   var tuples: string[] = statistics.map(statistic => {
     var day_string = moment.utc(statistic.day).format('YYYY-MM-DD');
