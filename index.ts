@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as http from 'http';
 import * as optimist from 'optimist';
 import {logger, Level} from 'loge';
+import {executePatches} from 'sql-patch';
 
 import {db} from './database';
 import {controller} from './controller';
@@ -53,7 +54,7 @@ export function main() {
     db.createDatabaseIfNotExists(error => {
       if (error) throw error;
 
-      db.executePatches('_migrations', path.join(__dirname, 'migrations'), error => {
+      executePatches(db, '_migrations', path.join(__dirname, 'migrations'), error => {
         if (error) throw error;
 
         server.listen(argv.port, argv.hostname);

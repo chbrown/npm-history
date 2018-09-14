@@ -23,6 +23,7 @@
     "optimist": "*",
     "regex-router": "*",
     "request": "*",
+    "sql-patch": "*",
     "sqlcmd-pg": "*",
     "streaming": "*"
   },
