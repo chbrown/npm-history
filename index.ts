@@ -7,7 +7,7 @@ import {executePatches} from 'sql-patch';
 import {db} from './database';
 import {controller} from './controller';
 
-var server = http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   logger.debug('%s %s', req.method, req.url);
   // enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,10 +19,10 @@ server.on('listening', () => {
   const addressString = typeof address == 'string' ? address : `${address.address}:${address.port}`;
   logger.info('server listening on http://%s', addressString);
 });
-server['timeout'] = 10*60*1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
+server.timeout = 10 * 60 * 1000; // defaults to 2 * 60 * 1000 = 120000 (2 minutes)
 
 export function main() {
-  var argvparser = optimist
+  const argvparser = optimist
     .usage('Usage: npm-history -p 80')
     .describe({
       hostname: 'hostname to listen on',
@@ -42,7 +42,7 @@ export function main() {
     })
     .boolean(['help', 'verbose', 'version']);
 
-  var argv = argvparser.argv;
+  const argv = argvparser.argv;
   logger.level = argv.verbose ? Level.debug : Level.info;
 
   if (argv.help) {
@@ -55,8 +55,8 @@ export function main() {
     db.createDatabaseIfNotExists(error => {
       if (error) throw error;
 
-      executePatches(db, '_migrations', path.join(__dirname, 'migrations'), error => {
-        if (error) throw error;
+      executePatches(db, '_migrations', path.join(__dirname, 'migrations'), patchError => {
+        if (patchError) throw patchError;
 
         server.listen(argv.port, argv.hostname);
       });

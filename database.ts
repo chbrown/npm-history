@@ -22,8 +22,8 @@ export const db = new Connection({
 });
 
 // connect db log events to local logger
-db.on('log', function(ev) {
-  var args = [ev.format].concat(ev.args);
+db.on('log', ev => {
+  const args = [ev.format].concat(ev.args);
   logger[ev.level].apply(logger, args);
 });
 
@@ -35,13 +35,13 @@ SQL query for inserting statistic rows. I don't think there are any limits on
 the number of parameters you can have in a prepared query.
 */
 function buildMultirowInsert(package_id: number, statistics: Statistic[]): [string, any[]] {
-  var args: any[] = [package_id];
-  var tuples: string[] = statistics.map(statistic => {
-    var day_string = moment.utc(statistic.day).format('YYYY-MM-DD');
-    var tuple = [
+  const args: any[] = [package_id];
+  const tuples: string[] = statistics.map(statistic => {
+    const day_string = moment.utc(statistic.day).format('YYYY-MM-DD');
+    const tuple = [
       '$1',
-      '$' + args.push(day_string),
-      '$' + args.push(statistic.downloads),
+      `$${args.push(day_string)}`,
+      `$${args.push(statistic.downloads)}`,
     ];
     return `(${tuple.join(', ')})`;
   });
@@ -54,14 +54,15 @@ one if needed.
 */
 function findOrCreatePackage(name: string, callback: (error: Error, package_row?: Package) => void) {
   db.Select('package')
-  .whereEqual({name: name})
+  .whereEqual({name})
   .execute((error: Error, rows: Package[]) => {
     if (error) return callback(error);
     if (rows.length > 0) return callback(null, rows[0]);
     db.Insert('package')
-    .set({name: name}).returning('*')
-    .execute((error: Error, rows: Package[]) => {
-      return callback(null, rows[0]);
+    .set({name}).returning('*')
+    .execute((insertError: Error, insertRows: Package[]) => {
+      if (insertError) return callback(insertError);
+      return callback(null, insertRows[0]);
     });
   });
 }
@@ -81,18 +82,18 @@ Statistic objects, where `downloads` is zero for the days omitted from the respo
 */
 function getRangeStatistics(name: string, start: moment.Moment, end: moment.Moment,
                             callback: (error: Error, statistics?: Statistic[]) => void) {
-  var url = `https://api.npmjs.org/downloads/range/${start.format('YYYY-MM-DD')}:${end.format('YYYY-MM-DD')}/${name}`;
+  const url = `https://api.npmjs.org/downloads/range/${start.format('YYYY-MM-DD')}:${end.format('YYYY-MM-DD')}/${name}`;
   logger.debug('fetching "%s"', url);
-  request.get({url: url, json: true}, (error: Error, response: http.IncomingMessage, body: DownloadsRangeResponse) => {
+  request.get({url, json: true}, (error: Error, response: http.IncomingMessage, body: DownloadsRangeResponse) => {
     if (error) return callback(error);
 
-    var downloads_default = 0;
+    let downloads_default = 0;
 
     if (body.error) {
       // we consider missing stats (0008) a non-fatal error, though I'm not sure
       // what causes it. but instead of setting the downloads for those dates to 0,
       // which is probably what the server means, we set them to -1 (as a sort of error value)
-      if (body.error == "no stats for this package for this range (0008)") {
+      if (body.error == 'no stats for this package for this range (0008)') {
         body.downloads = [];
         downloads_default = -1;
       }
@@ -105,15 +106,15 @@ function getRangeStatistics(name: string, start: moment.Moment, end: moment.Mome
 
     // body.downloads is a list of Statistics, but it's not very useful because
     // it might be missing dates.
-    var downloads: {[day: string]: number} = {};
+    const downloads: {[day: string]: number} = {};
     body.downloads.forEach(download => downloads[download.day] = download.downloads);
 
     // The start/end in the response should be identical to the start/end we
     // sent. Should we check?
-    var statistics: Statistic[] = [];
+    const statistics: Statistic[] = [];
     // Use start as a cursor for all the days we want to fill
     while (!start.isAfter(end)) {
-      var day = start.format('YYYY-MM-DD');
+      const day = start.format('YYYY-MM-DD');
       statistics.push({
         day: start.clone().toDate(),
         downloads: downloads[day] || downloads_default,
@@ -131,8 +132,8 @@ latest, and return the number of statistics at the beginning where the downloads
 count is -1 (meaning, invalid).
 */
 function countMissingStatistics(statistics: Statistic[]): number {
-  var missing = 0;
-  for (var length = statistics.length; missing < length; missing++) {
+  let missing = 0;
+  for (const length = statistics.length; missing < length; missing++) {
     if (statistics[missing].downloads > -1) {
       break;
     }
@@ -161,10 +162,10 @@ Each character represents 1 month or so.
 function determineNeededEndpoints(statistics: Statistic[],
                                   min_range_days: number,
                                   max_range_days: number): [moment.Moment, moment.Moment] {
-  var latest_statistic = statistics[statistics.length - 1] || {day: NPM_EPOCH, downloads: -1};
-  var latest = moment.utc(latest_statistic.day);
+  const latest_statistic = statistics[statistics.length - 1] || {day: NPM_EPOCH, downloads: -1};
+  const latest = moment.utc(latest_statistic.day);
   // default to starting with the most recent period
-  var now = moment.utc();
+  const now = moment.utc();
   // but NPM download counts are not available until after the day is over.
   now.subtract(1, 'day');
   // and they're updated shortly after the UTC day is over. To be safe, we'll
@@ -179,13 +180,13 @@ function determineNeededEndpoints(statistics: Statistic[],
   if (now.diff(latest, 'days') >= min_range_days) {
     // set the end point to `max_range_days` after the latest fetched statistic,
     // back, but don't reach into the future.
-    var start = latest.clone().add(1, 'days');
-    var end = moment.min(start.clone().add(max_range_days - 1, 'days'), now);
+    const start = latest.clone().add(1, 'days');
+    const end = moment.min(start.clone().add(max_range_days - 1, 'days'), now);
     return [start, end];
   }
   else {
     // otherwise, we fill in the backlog
-    var backlog_exhausted = countMissingStatistics(statistics) > 180;
+    const backlog_exhausted = countMissingStatistics(statistics) > 180;
     // case 3) if we've fetched more than half a year of invalid counts, we assume
     // that we've exhausted the available data going back, and won't ask for any more.
     if (backlog_exhausted) {
@@ -194,11 +195,11 @@ function determineNeededEndpoints(statistics: Statistic[],
     // case 2) set the endpoints to the most recent period preceding all of the
     // data we currently have.
     // if we've gotten to this point, statistics is sure to be non-empty
-    var earliest = moment.utc(statistics[0].day);
+    const earliest = moment.utc(statistics[0].day);
     // we work backwards from the earliest date we do have, setting the end to
     // the day preceding the earliest day we've collected so far
-    var end = earliest.subtract(1, 'day');
-    var start = end.clone().subtract(max_range_days - 1, 'days');
+    const end = earliest.subtract(1, 'day');
+    const start = end.clone().subtract(max_range_days - 1, 'days');
     return [start, end];
   }
 }
@@ -215,11 +216,11 @@ export function getPackageStatistics(name: string,
     .add('day', 'downloads')
     .whereEqual({package_id: package_row.id})
     .orderBy('day')
-    .execute((error: Error, local_statistics: Statistic[]) => {
-      if (error) return callback(error);
+    .execute((selectError: Error, local_statistics: Statistic[]) => {
+      if (selectError) return callback(selectError);
 
       // 2. determine what we want to get next
-      var [start, end] = determineNeededEndpoints(local_statistics, min_range_days, max_range_days);
+      const [start, end] = determineNeededEndpoints(local_statistics, min_range_days, max_range_days);
 
       // 3. determineNeededEndpoints may return [null, null] if there are no
       // remaining ranges that we need to fetch
@@ -229,16 +230,16 @@ export function getPackageStatistics(name: string,
       }
 
       // 4. get the next unseen statistics
-      getRangeStatistics(name, start, end, (error, statistics) => {
-        if (error) return callback(error);
+      getRangeStatistics(name, start, end, (statsError, statistics) => {
+        if (statsError) return callback(statsError);
 
         // 5. save the values we just fetched
-        var [sql, args] = buildMultirowInsert(package_row.id, statistics);
-        db.executeSQL(sql, args, (error: Error) => {
-          if (error) return callback(error);
+        const [sql, args] = buildMultirowInsert(package_row.id, statistics);
+        db.executeSQL(sql, args, (sqlError: Error) => {
+          if (sqlError) return callback(sqlError);
 
           // 6. merge local and new statistics for the response
-          var total_statistics = statistics.concat(local_statistics).sort((a, b) => <any>a.day - <any>b.day);
+          const total_statistics = statistics.concat(local_statistics).sort((a, b) => a.day as any - b.day as any);
           callback(null, total_statistics);
         });
       });
@@ -262,7 +263,7 @@ export function queryAverageDownloads(start: moment.Moment,
   .execute((error: Error, rows: {name: string, average: number}[]) => {
     if (error) return callback(error);
     logger.info('averaged downloads for %d packages', rows.length);
-    var packages: {[index: string]: number} = {};
+    const packages: {[index: string]: number} = {};
     rows.forEach(row => packages[row.name] = row.average);
     callback(null, packages);
   });
