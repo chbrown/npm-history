@@ -1,5 +1,2 @@
-controller.ts
-database.ts
-index.ts
-Makefile
+*.ts
 tsconfig.json
